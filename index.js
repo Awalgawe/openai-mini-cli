@@ -8,7 +8,19 @@ import { logSpinner } from "./spinner.js";
 
 dotenv.config();
 
-const [, , prompt] = process.argv;
+const STOPS = {
+  HUMAN: "[Human:]",
+  AI: "[AI:]",
+};
+
+const [, , subject] = process.argv;
+
+const contexts = {
+  default:
+    "The following is a conversation with an AI assistant. The assistant is helpful, creative, clever, and very friendly.",
+  expert:
+    "The following is a conversation with an AI assistant. The assistant is helpful, clever, very friendly and an expert in {subject}.",
+};
 
 const apiKey = process.env.OPENAI_API_KEY;
 
@@ -20,37 +32,58 @@ if (!apiKey) {
 const configuration = new Configuration({ apiKey });
 const openai = new OpenAIApi(configuration);
 
+let context = subject
+  ? contexts.expert.replace("{subject}", subject)
+  : contexts.default;
+
 async function loop() {
   let stop;
 
   try {
-    const { prompt } = await inquirer.prompt({
+    const { message } = await inquirer.prompt({
       type: "input",
-      name: "prompt",
-      message: "Prompt",
+      name: "message",
+      message: "You:",
     });
 
     stop = logSpinner(process.stdout);
 
-    const response = await openai.createCompletion({
+    let prompt = `${context}\n\n${STOPS.HUMAN}${message}\n\n${STOPS.AI}`;
+
+    const completion = await openai.createCompletion({
       model: "text-davinci-003",
       prompt,
-      temperature: 0.7,
-      max_tokens: 256,
+      temperature: 0,
       top_p: 1,
+      max_tokens: 256,
       frequency_penalty: 0,
       presence_penalty: 0,
+      stop: [STOPS.HUMAN, STOPS.AI],
     });
+
+    if (process.env.DEBUG) {
+      console.log(completion.data);
+    }
 
     stop();
 
-    console.log(response.data.choices[0]?.text?.trim() ?? "no response", "\n");
+    const response = completion.data.choices[0]?.text;
+
+    if (!response) {
+      console.error("no response from AI");
+    }
+
+    console.log(`AI: ${response}`);
+
+    context = `${prompt}${response}\n\n`;
 
     loop();
   } catch (error) {
     stop?.();
     console.log(error?.message ?? error);
-    process.exit(1);
+    process.nextTick(() => {
+      process.exit(1);
+    });
   }
 }
 
