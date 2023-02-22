@@ -2,11 +2,13 @@
 "use strict";
 
 import * as dotenv from "dotenv";
-import { Configuration, OpenAIApi } from "openai";
 import inquirer from "inquirer";
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Configuration, OpenAIApi } from "openai";
 import { logSpinner } from "./spinner.js";
 
-dotenv.config();
+dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '.env')});
 
 const STOPS = {
   HUMAN: "[Human:]",
